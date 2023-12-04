@@ -41,6 +41,14 @@ impl Card {
 
         return amount;
     }
+
+    fn score(&self) -> u32 {
+        let amount = self.win_amount();
+        match amount {
+            0 => 0,
+            x => 2u32.pow(x - 1),
+        }
+    }
 }
 
 fn parse_numbers(input: &str) -> IResult<&str, Vec<u32>> {
@@ -76,51 +84,31 @@ fn parse_card(input: &str) -> IResult<&str, Card> {
 fn solution_1(input: &str) -> u32 {
     let mut solution = 0;
 
-    let mut lines = &input[..];
-
-    while lines.len() > 0 {
-        let card: Card;
-        (lines, card) = parse_card(lines).unwrap();
-
-        if lines.chars().nth(0) == Some('\n') {
-            lines = &lines[1..];
-        }
-
-        let amount = card.win_amount();
-        if amount > 0 {
-            solution += 2u32.pow(amount - 1);
-        }
+    for line in input.lines() {
+        let (_, card) = parse_card(line).unwrap();
+        solution += card.score();
     }
 
     return solution;
 }
 
 fn solution_2(input: &str) -> u32 {
-    let mut lines = &input[..];
-
     // guess this is big enough?
     let mut copies: [u32; 1000] = [1; 1000];
-    let mut last_card_id = 0;
 
-    while lines.len() > 0 {
-        let card: Card;
-        (lines, card) = parse_card(lines).unwrap();
-
-        if lines.chars().nth(0) == Some('\n') {
-            lines = &lines[1..];
-        }
+    for line in input.lines() {
+        let (_, card) = parse_card(line).unwrap();
 
         let amount = card.win_amount();
-        
         let card_copies = copies[card.id as usize];
+
         for i in 0..amount {
             copies[(card.id + i + 1) as usize] += card_copies;
         }
-
-        last_card_id = card.id;
     }
 
-    let solution = copies.iter().skip(1).take(last_card_id as usize).sum();
+    let last_card_id = input.lines().count();
+    let solution = copies.iter().skip(1).take(last_card_id).sum();
 
     return solution;
 }
