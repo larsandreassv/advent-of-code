@@ -69,15 +69,16 @@ fn parse_card(input: &str) -> IResult<&str, Card> {
         tuple((nom::character::complete::char(':'), space1)))
     (input)?;
 
-    let (input, winning_numbers) = separated_list1(
+    let (input, (winning_numbers, _, scratch_numbers)) = tuple((
+        delimited(space0, parse_numbers, space0),
         character::complete::char('|'),
         delimited(space0, parse_numbers, space0)
-    )(input)?;
+    ))(input)?;
 
     Ok((input, Card {
         id: card_id.parse().unwrap(),
-        winning_numbers: winning_numbers[0].clone(),
-        scratch_numbers: winning_numbers[1].clone(),
+        winning_numbers,
+        scratch_numbers,
     }))
 }
 
