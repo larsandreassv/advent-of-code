@@ -1,42 +1,76 @@
-use std::collections::HashMap;
-
 use aoc_helper::{AocDay, Puzzle};
-use nom::{bytes::complete::tag, character::complete::digit1, multi::*, sequence::terminated, *};
+use nom::{
+    bytes::complete::tag,
+    character::complete::{digit1, space0, space1},
+    multi::*,
+    sequence::{delimited, terminated, tuple},
+    *,
+};
 
-fn parse_card(input: &str) -> IResult<&str, u32> {
-    let (input, _) = tag("Card")(input)?;
-    let (input, _) = many1(tag(" "))(input)?;
-    let (input, card_id) = digit1(input)?;
-    let (input, _) = tag(": ")(input)?;
-    Ok((input, card_id.parse::<u32>().unwrap()))
+struct Card {
+    id: u32,
+    winning_numbers: Vec<u32>,
+    scratch_numbers: Vec<u32>,
 }
 
-fn parse_scratch_numbers(input: &str) -> IResult<&str, (Vec<u32>, Vec<u32>)> {
-    let (input, winning_numbers) = separated_list1(many1(tag(" ")), digit1)(input)?;
-    let (input, _) = many1(tag(" "))(input)?;
-    let (input, _) = tag("|")(input)?;
-    let (input, _) = many1(tag(" "))(input)?;
-    let (input, scratch_numbers) = separated_list1(many1(tag(" ")), digit1)(input)?;
-    Ok((
-        input,
-        (
-            winning_numbers
-                .iter()
-                .map(|x| x.parse::<u32>().unwrap())
-                .collect::<Vec<u32>>(),
-            scratch_numbers
-                .iter()
-                .map(|x| x.parse::<u32>().unwrap())
-                .collect::<Vec<u32>>(),
-        ),
-    ))
+impl Card {
+    fn win_amount(&self) -> u32 {
+        let mut bits_part_1: u64 = 0;
+        let mut bits_part_2: u64 = 0;
+
+        for number in &self.winning_numbers {
+            if *number > 50 {
+                bits_part_2 |= 1 << (*number - 50);
+            } else {
+                bits_part_1 |= 1 << *number;
+            }
+        }
+
+        let mut amount = 0;
+        for number in &self.scratch_numbers {
+            if *number > 50 {
+                if bits_part_2 & (1 << (*number - 50)) != 0 {
+                    amount += 1;
+                }
+            } else {
+                if bits_part_1 & (1 << *number) != 0 {
+                    amount += 1;
+                }
+            }
+        }
+
+        return amount;
+    }
 }
 
-fn parse_scratch_card_line(input: &str) -> IResult<&str, (u32, Vec<u32>, Vec<u32>)> {
-    let (input, card_id) = parse_card(input)?;
-    let (input, _) = many0(tag(" "))(input)?;
-    let (input, (winning_numbers, scratch_numbers)) = parse_scratch_numbers(input)?;
-    Ok((input, (card_id, winning_numbers, scratch_numbers)))
+fn parse_numbers(input: &str) -> IResult<&str, Vec<u32>> {
+    fold_many1(
+        terminated(nom::character::complete::u32, space0),
+        Vec::new,
+        |mut acc: Vec<u32>, item| {
+            acc.push(item);
+            acc
+        },
+    )(input)
+}
+
+fn parse_card(input: &str) -> IResult<&str, Card> {
+    let (input, card_id) = delimited(
+        tuple((tag("Card"), space1)),
+        digit1,
+        tuple((nom::character::complete::char(':'), space1)))
+    (input)?;
+
+    let (input, winning_numbers) = separated_list1(
+        character::complete::char('|'),
+        delimited(space0, parse_numbers, space0)
+    )(input)?;
+
+    Ok((input, Card {
+        id: card_id.parse().unwrap(),
+        winning_numbers: winning_numbers[0].clone(),
+        scratch_numbers: winning_numbers[1].clone(),
+    }))
 }
 
 fn solution_1(input: &str) -> u32 {
@@ -45,39 +79,14 @@ fn solution_1(input: &str) -> u32 {
     let mut lines = &input[..];
 
     while lines.len() > 0 {
-        let mut bits_part_1: u64 = 0;
-        let mut bits_part_2: u64 = 0;
-
-        let winning_numbers: Vec<u32>;
-        let scratch_numbers: Vec<u32>;
-
-        (lines, (_, winning_numbers, scratch_numbers)) = parse_scratch_card_line(lines).unwrap();
+        let card: Card;
+        (lines, card) = parse_card(lines).unwrap();
 
         if lines.chars().nth(0) == Some('\n') {
             lines = &lines[1..];
         }
 
-        for number in winning_numbers {
-            if number > 50 {
-                bits_part_2 |= 1 << (number - 50);
-            } else {
-                bits_part_1 |= 1 << number;
-            }
-        }
-
-        let mut amount = 0;
-        for number in scratch_numbers {
-            if number > 50 {
-                if bits_part_2 & (1 << (number - 50)) != 0 {
-                    amount += 1;
-                }
-            } else {
-                if bits_part_1 & (1 << number) != 0 {
-                    amount += 1;
-                }
-            }
-        }
-
+        let amount = card.win_amount();
         if amount > 0 {
             solution += 2u32.pow(amount - 1);
         }
@@ -87,8 +96,6 @@ fn solution_1(input: &str) -> u32 {
 }
 
 fn solution_2(input: &str) -> u32 {
-    let mut solution = 0;
-
     let mut lines = &input[..];
 
     // guess this is big enough?
@@ -96,50 +103,24 @@ fn solution_2(input: &str) -> u32 {
     let mut last_card_id = 0;
 
     while lines.len() > 0 {
-        let mut bits_part_1: u64 = 0;
-        let mut bits_part_2: u64 = 0;
-
-        let card_id: u32;
-        let winning_numbers: Vec<u32>;
-        let scratch_numbers: Vec<u32>;
-
-        (lines, (card_id, winning_numbers, scratch_numbers)) =
-            parse_scratch_card_line(lines).unwrap();
+        let card: Card;
+        (lines, card) = parse_card(lines).unwrap();
 
         if lines.chars().nth(0) == Some('\n') {
             lines = &lines[1..];
         }
 
-        for number in winning_numbers {
-            if number > 50 {
-                bits_part_2 |= 1 << (number - 50);
-            } else {
-                bits_part_1 |= 1 << number;
-            }
-        }
-
-        let mut amount = 0;
-        for number in scratch_numbers {
-            if number > 50 {
-                if bits_part_2 & (1 << (number - 50)) != 0 {
-                    amount += 1;
-                }
-            } else {
-                if bits_part_1 & (1 << number) != 0 {
-                    amount += 1;
-                }
-            }
-        }
-
-        let card_copies = copies[card_id as usize];
+        let amount = card.win_amount();
+        
+        let card_copies = copies[card.id as usize];
         for i in 0..amount {
-            copies[(card_id + i + 1) as usize] += card_copies;
+            copies[(card.id + i + 1) as usize] += card_copies;
         }
 
-        last_card_id = card_id;
+        last_card_id = card.id;
     }
 
-    solution = copies.iter().skip(1).take(last_card_id as usize).sum();
+    let solution = copies.iter().skip(1).take(last_card_id as usize).sum();
 
     return solution;
 }
