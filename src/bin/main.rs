@@ -1,6 +1,4 @@
 fn main() {
-    let foo = vec![1, 2];
-
-    println!("{:?}", foo.g[0]);
-    println!("{:?}", foo[23]);
+    let foo = 1u32 / 2323u32;
+    println!("{}", foo);
 }

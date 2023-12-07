@@ -73,6 +73,81 @@ impl BitTable {
     }
 }
 
+struct FoundNumber {
+    number: u32,
+    indecies: Vec<u32>
+}
+
+fn get_number_from_index(input: &str, index: usize) -> FoundNumber {
+    let mut right_offset = 0;
+    let mut left_offset = 0;
+
+    while index + right_offset + 1 < input.len() {
+        if let Some(c) = input.chars().nth(index + right_offset + 1) {
+            if c.is_numeric() {
+                right_offset += 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    while index - left_offset > 0 {
+        if let Some(c) = input.chars().nth(index - left_offset - 1) {
+            if c.is_numeric() {
+                left_offset += 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    let number_string = input
+        .chars()
+        .skip(index - left_offset)
+        .take(left_offset + right_offset + 1)
+        .collect::<String>();
+
+    FoundNumber { 
+        number: number_string.parse::<u32>().unwrap(),
+        indecies: (index - left_offset..index + right_offset + 1).map(|i| i as u32).collect()
+    }
+}
+
+fn get_numbers_around(line_above: &str, line: &str, line_below: &str, index: usize) -> Vec<u32> {
+    let mut numbers: Vec<u32> = Vec::new();
+    let scanned_indecies = [false; 8];
+
+    //check above
+    for i in index - 1..index + 1 {
+        if let Some(c) = line_above.chars().nth(i) && scanned_indecies[i as usize] {
+            if c.is_numeric() {
+                let found_number = get_number_from_index(line_above, i);
+                numbers.push(found_number.number);
+                for i in found_number.indecies {
+                    scanned_indecies[i as usize] = true;
+                }
+            }
+        }
+    }
+
+    if let Some(c) = line_above.chars().nth(index) {
+        if c.is_numeric() {
+            let found_number = get_number_from_index(line_above, index);
+            numbers.push(found_number.number);
+            for i in found_number.indecies {
+                scanned_indecies[i as usize] = true;
+            }
+        }
+    }
+
+    numbers
+}
+
 pub type IResult<I, O, E = String> = Result<(I, O), E>;
 
 fn parse_number(input: &str) -> IResult<&str, u32> {
