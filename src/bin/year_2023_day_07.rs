@@ -9,7 +9,6 @@ use nom::{
 struct Game {
     hand_rank: u32,
     pot: u32,
-    card: String
 }
 
 enum HandRankKind {
@@ -23,14 +22,13 @@ enum HandRankKind {
 }
 
 fn parse_game(input: &str) -> IResult<&str, Game> {
-    let copy_input = input.to_string();
     let (input, (hand_rank, pot)) = separated_pair(
         parse_hand_rank,
         space0,
         digit1.map(|x: &str| x.parse::<u32>().unwrap()),
     )(input)?;
 
-    let game = Game { card: copy_input, hand_rank, pot };
+    let game = Game { hand_rank, pot };
 
     Ok((input, game))
 }
@@ -93,6 +91,81 @@ fn compute_hand_rank_kind(cards: &[u8]) -> HandRankKind {
     }
 }
 
+
+fn parse_game_2(input: &str) -> IResult<&str, Game> {
+    let (input, (hand_rank, pot)) = separated_pair(
+        parse_hand_rank_2,
+        space0,
+        digit1.map(|x: &str| x.parse::<u32>().unwrap()),
+    )(input)?;
+
+    let game = Game { hand_rank, pot };
+
+    Ok((input, game))
+}
+
+fn parse_hand_rank_2(input: &str) -> IResult<&str, u32> {
+    let mut cards = [0; 5];
+    let mut chars = input.chars();
+    for i in 0..5 {
+        cards[i] = match chars.next() {
+            Some('A') => 14,
+            Some('K') => 13,
+            Some('Q') => 12,
+            Some('J') => 0,
+            Some('T') => 10,
+            Some(x) if x.is_digit(10) => x.to_digit(10).unwrap() as u8,
+            _ => return Result::Err(nom::Err::Failure(Error::new(input, ErrorKind::Digit))),
+        }
+    }
+
+    let hand_rank = compute_hand_rank_2(&cards);
+
+    Ok((&input[5..], hand_rank))
+}
+
+fn compute_hand_rank_2(cards: &[u8]) -> u32 {
+    let hand_rank_kind = compute_hand_rank_kind_2(cards) as u32;
+    let lexicographic_rank = compute_lexicographic_rank(cards);
+
+    // 4 bits for hand rank kind and 4 * 5 = 20 bits for lexicographic rank (which fits into a u32)
+    (hand_rank_kind << 20) + lexicographic_rank
+}
+
+fn compute_hand_rank_kind_2(cards: &[u8]) -> HandRankKind {
+    let mut counts: [u8; 15] = [0; 15];
+    for card in cards.iter() {
+        counts[*card as usize] += 1;
+    }
+
+    let (first_max, second_max) =
+        counts
+            .iter()
+            .skip(1)
+            .fold((0, 0), |(first_max, second_max), count| {
+                if *count >= first_max {
+                    (*count, first_max)
+                } else if *count > second_max {
+                    (first_max, *count)
+                } else {
+                    (first_max, second_max)
+                }
+            });
+            
+
+    let joker_count = counts[0] as u8;
+
+    match (first_max + joker_count, second_max) {
+        (5, _) => HandRankKind::FiveOfAKind,
+        (4, _) => HandRankKind::FourOfAKind,
+        (3, 2) => HandRankKind::FullHouse,
+        (3, _) => HandRankKind::ThreeOfAKind,
+        (2, 2) => HandRankKind::TwoPair,
+        (2, _) => HandRankKind::OnePair,
+        _ => HandRankKind::HighCard,
+    }
+}
+
 fn compute_lexicographic_rank(cards: &[u8]) -> u32 {
     let mut result = 0;
     for (index, card) in cards.iter().rev().enumerate() {
@@ -120,7 +193,21 @@ fn solution_1(input: &str) -> u64 {
 }
 
 fn solution_2(input: &str) -> u32 {
-    0
+    let mut solution: u32 = 0;
+    let mut games = Vec::new();
+    for line in input.lines() {
+        if let Ok((_, game)) = parse_game_2(line) {
+            games.push(game);
+        }
+    }
+
+    games.sort_by_key(|x| x.hand_rank);
+
+    for (index, game) in games.iter().enumerate() {
+        solution += game.pot * (index as u32 + 1);
+    }
+
+    solution 
 }
 
 fn main() {
@@ -265,6 +352,22 @@ mod tests {
         assert_eq!(
             solution_1(&input),
             12
+        );
+    }
+
+    #[test]
+    fn test_solution_2_1() {
+        let input = vec![
+            "32T3K 765",
+            "T55J5 684",
+            "KK677 28",
+            "KTJJT 220",
+            "QQQJA 483",
+        ].join("\n");
+
+        assert_eq!(
+            solution_2(&input),
+            5905
         );
     }
 }
