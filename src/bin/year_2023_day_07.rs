@@ -13,8 +13,9 @@ struct Game {
 }
 
 enum HandRankKind {
-    OneOfAKind = 1,
-    TwoOfAKind = 2,
+    HighCard = 0,
+    OnePair = 1,
+    TwoPair = 2,
     ThreeOfAKind = 3,
     FullHouse = 4,
     FourOfAKind = 5,
@@ -86,8 +87,9 @@ fn compute_hand_rank_kind(cards: &[u8]) -> HandRankKind {
         (4, _) => HandRankKind::FourOfAKind,
         (3, 2) => HandRankKind::FullHouse,
         (3, _) => HandRankKind::ThreeOfAKind,
-        (2, _) => HandRankKind::TwoOfAKind,
-        _ => HandRankKind::OneOfAKind,
+        (2, 2) => HandRankKind::TwoPair,
+        (2, _) => HandRankKind::OnePair,
+        _ => HandRankKind::HighCard,
     }
 }
 
